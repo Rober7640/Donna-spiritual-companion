@@ -38,6 +38,7 @@ export default function Chat() {
   const credits = useCredits();
   const emailGate = useEmailGate();
   const [showTopUp, setShowTopUp] = useState(false);
+  const [isOutOfCredits, setIsOutOfCredits] = useState(false);
   const presenceLine = (() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Here with you this morning.";
@@ -50,6 +51,9 @@ export default function Chat() {
   useEffect(() => {
     if (user && credits.balanceMinutes !== null && credits.balanceMinutes <= 0) {
       setShowTopUp(true);
+      setIsOutOfCredits(true);
+    } else if (user && credits.balanceMinutes !== null && credits.balanceMinutes > 0) {
+      setIsOutOfCredits(false);
     }
   }, [user, credits.balanceMinutes]);
 
@@ -57,6 +61,7 @@ export default function Chat() {
   const handleTrialExpired = useCallback(() => {
     if (user) {
       setShowTopUp(true);
+      setIsOutOfCredits(true);
       credits.refreshBalance(); // sync with server to set balance to 0
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,6 +71,7 @@ export default function Chat() {
   useEffect(() => {
     if (creditsExpired) {
       setShowTopUp(true);
+      setIsOutOfCredits(true);
       credits.refreshBalance();
     }
     // Only react to creditsExpired changing, not credits object
@@ -160,6 +166,7 @@ export default function Chat() {
               timestamp: string;
               signal?: string;
             }>;
+
             if (transcript.length > 0) {
               const restored = transcript.map((m: { role: "user" | "assistant"; content: string; timestamp: string; signal?: string }, i: number) => ({
                 id: `restored-${i}-${Date.now()}`,
@@ -168,9 +175,30 @@ export default function Chat() {
                 timestamp: new Date(m.timestamp),
                 signal: m.signal as import("@shared/types").UserSignal | undefined,
               }));
-              chat.restoreSession(savedSessionId, restored);
-              // Update sessionStorage with server truth
-              sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
+
+              // If session is still active, restore it directly
+              if (!session.endedAt) {
+                chat.restoreSession(savedSessionId, restored);
+                sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
+                return;
+              }
+
+              // Session was ended (e.g. auto-end before Stripe checkout)
+              // Start a new session but pre-populate with the old messages
+              const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
+              const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
+              const userName = sessionStorage.getItem("onboarding_name") || undefined;
+              await startSession(faithTradition, onboardingConcern, userName);
+              // After startSession sets the new sessionId, restore the old messages visually
+              // Use a small delay to ensure sessionId is set
+              setTimeout(() => {
+                const newSessionId = sessionStorage.getItem("chatSessionId");
+                if (newSessionId) {
+                  chat.restoreSession(newSessionId, restored);
+                  sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
+                }
+              }, 500);
+              sessionStorage.removeItem("chatSessionId");
               return;
             }
           }
@@ -325,8 +353,9 @@ export default function Chat() {
                         hour >= 17 && hour < 21 ? "Good evening" :
                         "I'm glad you're here tonight";
 
-                      // Returning user with previous session summary
-                      if (user?.lastSessionSummary) {
+                      // Returning user with previous session summary (only on fresh login, not after purchase)
+                      const isReturningLogin = !sessionStorage.getItem("onboarding_faith") && !sessionStorage.getItem("chatSessionId");
+                      if (user?.lastSessionSummary && isReturningLogin) {
                         const userName = name || "sweetheart";
                         // Convert third-person summary to second-person (e.g. "Lewis shared" → "you shared")
                         let summary = user.lastSessionSummary;
@@ -420,7 +449,11 @@ export default function Chat() {
       {/* TopUp Popup (authenticated users with 0 credits) */}
       <TopUpPopup
         isOpen={showTopUp}
-        onClose={() => setShowTopUp(false)}
+        onClose={() => {
+          // Only allow closing if user still has credits (e.g. just purchased)
+          // If out of credits, popup stays — they must purchase to continue
+          if (!isOutOfCredits) setShowTopUp(false);
+        }}
         onCheckout={() => { navigatingToCheckout.current = true; }}
       />
 
@@ -434,7 +467,8 @@ export default function Chat() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="What's on your heart..."
+              placeholder={isOutOfCredits ? "Purchase a plan to continue..." : "What's on your heart..."}
+              disabled={isOutOfCredits}
               className="h-12 rounded-full border-slate-200 bg-slate-50 pr-12 text-base shadow-sm focus-visible:ring-offset-0 focus-visible:border-blue-300 focus-visible:ring-2 focus-visible:ring-blue-100"
             />
             <Button
@@ -442,7 +476,7 @@ export default function Chat() {
               size="icon"
               aria-label="Send message"
               className="absolute right-1 top-1 h-10 w-10 rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-all disabled:opacity-50"
-              disabled={!inputValue.trim() || isWaitingForResponse}
+              disabled={!inputValue.trim() || isWaitingForResponse || isOutOfCredits}
             >
               <Send className="h-5 w-5 ml-0.5" />
             </Button>
