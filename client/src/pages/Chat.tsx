@@ -22,6 +22,7 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigatingToCheckout = useRef(false);
+  const pendingRestoreMessages = useRef<Array<{ id: string; role: "user" | "assistant"; content: string; timestamp: Date; signal?: import("@shared/types").UserSignal }> | null>(null);
   const { user, token } = useAuth();
   const chat = useChatContext();
   const {
@@ -142,6 +143,15 @@ export default function Chat() {
     }
   }, []);
 
+  // Once a new session is created and we have pending messages to restore, inject them
+  useEffect(() => {
+    if (chat.sessionId && pendingRestoreMessages.current) {
+      const msgs = pendingRestoreMessages.current;
+      pendingRestoreMessages.current = null;
+      chat.restoreSession(chat.sessionId, msgs);
+    }
+  }, [chat.sessionId]);
+
   // Start or restore session on mount
   useEffect(() => {
     if (chat.sessionId) return;
@@ -151,8 +161,10 @@ export default function Chat() {
     const savedTranscript = sessionStorage.getItem("chatTranscript");
 
     if (savedSessionId) {
-      // Fetch the authoritative transcript from the server
       const tryRestore = async () => {
+        let restoredMessages: Array<{ id: string; role: "user" | "assistant"; content: string; timestamp: Date; signal?: import("@shared/types").UserSignal }> | null = null;
+
+        // Try fetching from server first
         try {
           const headers: Record<string, string> = {};
           if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -161,77 +173,58 @@ export default function Chat() {
           if (res.ok) {
             const session = await res.json();
             const transcript = (session.transcript || []) as Array<{
-              role: "user" | "assistant";
-              content: string;
-              timestamp: string;
-              signal?: string;
+              role: "user" | "assistant"; content: string; timestamp: string; signal?: string;
             }>;
 
             if (transcript.length > 0) {
-              const restored = transcript.map((m: { role: "user" | "assistant"; content: string; timestamp: string; signal?: string }, i: number) => ({
+              restoredMessages = transcript.map((m, i) => ({
                 id: `restored-${i}-${Date.now()}`,
-                role: m.role,
+                role: m.role as "user" | "assistant",
                 content: m.content,
                 timestamp: new Date(m.timestamp),
                 signal: m.signal as import("@shared/types").UserSignal | undefined,
               }));
 
-              // If session is still active, restore it directly
+              // If session is still active, restore it directly and we're done
               if (!session.endedAt) {
-                chat.restoreSession(savedSessionId, restored);
+                chat.restoreSession(savedSessionId, restoredMessages);
                 sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
                 return;
               }
-
-              // Session was ended (e.g. auto-end before Stripe checkout)
-              // Start a new session but pre-populate with the old messages
-              const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
-              const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
-              const userName = sessionStorage.getItem("onboarding_name") || undefined;
-              await startSession(faithTradition, onboardingConcern, userName);
-              // After startSession sets the new sessionId, restore the old messages visually
-              // Use a small delay to ensure sessionId is set
-              setTimeout(() => {
-                const newSessionId = sessionStorage.getItem("chatSessionId");
-                if (newSessionId) {
-                  chat.restoreSession(newSessionId, restored);
-                  sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
-                }
-              }, 500);
-              sessionStorage.removeItem("chatSessionId");
-              return;
             }
           }
         } catch {
-          // Server fetch failed — fall back to sessionStorage
+          // Server fetch failed
         }
 
-        // Fallback: use sessionStorage transcript
-        if (savedTranscript) {
+        // If no server messages, try sessionStorage
+        if (!restoredMessages && savedTranscript) {
           try {
             const parsed = JSON.parse(savedTranscript) as Array<{
-              role: "user" | "assistant";
-              content: string;
-              timestamp: string;
-              signal?: string;
+              role: "user" | "assistant"; content: string; timestamp: string; signal?: string;
             }>;
-            const restored = parsed.map((m, i) => ({
+            restoredMessages = parsed.map((m, i) => ({
               id: `restored-${i}-${Date.now()}`,
-              role: m.role,
+              role: m.role as "user" | "assistant",
               content: m.content,
               timestamp: new Date(m.timestamp),
               signal: m.signal as import("@shared/types").UserSignal | undefined,
             }));
-            chat.restoreSession(savedSessionId, restored);
-            return;
           } catch {
             // Corrupted data
           }
         }
 
-        // Everything failed — clean up and start fresh
+        // Clean up old session references
         sessionStorage.removeItem("chatSessionId");
         sessionStorage.removeItem("chatTranscript");
+
+        // If we have old messages, store them for injection after new session starts
+        if (restoredMessages && restoredMessages.length > 0) {
+          pendingRestoreMessages.current = restoredMessages;
+        }
+
+        // Start a fresh session
         const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
         const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
         const userName = sessionStorage.getItem("onboarding_name") || undefined;
@@ -249,6 +242,12 @@ export default function Chat() {
 
   const handleSend = async () => {
     if (!inputValue.trim() || isWaitingForResponse) return;
+
+    // If out of credits, show popup instead of sending
+    if (isOutOfCredits) {
+      setShowTopUp(true);
+      return;
+    }
 
     const text = inputValue.trim();
 
@@ -467,8 +466,8 @@ export default function Chat() {
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={isOutOfCredits ? "Purchase a plan to continue..." : "What's on your heart..."}
-              disabled={isOutOfCredits}
+              onFocus={() => { if (isOutOfCredits) setShowTopUp(true); }}
+              placeholder="What's on your heart..."
               className="h-12 rounded-full border-slate-200 bg-slate-50 pr-12 text-base shadow-sm focus-visible:ring-offset-0 focus-visible:border-blue-300 focus-visible:ring-2 focus-visible:ring-blue-100"
             />
             <Button
@@ -476,7 +475,7 @@ export default function Chat() {
               size="icon"
               aria-label="Send message"
               className="absolute right-1 top-1 h-10 w-10 rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-all disabled:opacity-50"
-              disabled={!inputValue.trim() || isWaitingForResponse || isOutOfCredits}
+              disabled={!inputValue.trim() || isWaitingForResponse}
             >
               <Send className="h-5 w-5 ml-0.5" />
             </Button>

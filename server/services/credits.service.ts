@@ -111,6 +111,10 @@ export async function fulfillCredits(
   const pkg = CREDIT_PACKAGES[packageKey];
   if (!pkg) throw new Error(`Unknown package: ${packageKey}`);
 
+  // Auto-expire any remaining trial credits before adding purchased credits
+  // This prevents stale trial minutes inflating the purchased balance
+  await checkTrialExpiration(userId);
+
   // Ensure balance row exists
   let balance = await storage.getCreditBalance(userId);
   if (!balance) {
