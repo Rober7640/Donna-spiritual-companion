@@ -51,6 +51,9 @@ export function useCredits(): UseCreditsReturn {
     (sessionId: string) => {
       sessionIdRef.current = sessionId;
 
+      // Refresh balance from server when starting a new session
+      refreshBalance();
+
       // Clear any existing heartbeat
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
@@ -71,7 +74,7 @@ export function useCredits(): UseCreditsReturn {
         }
       }, HEARTBEAT_INTERVAL_MS);
     },
-    [token],
+    [token, refreshBalance],
   );
 
   const stopHeartbeat = useCallback(() => {
