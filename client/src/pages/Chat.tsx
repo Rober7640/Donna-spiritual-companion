@@ -436,11 +436,7 @@ export default function Chat() {
       {/* TopUp Popup (authenticated users with 0 credits) */}
       <TopUpPopup
         isOpen={showTopUp}
-        onClose={() => {
-          // Only allow closing if user still has credits (e.g. just purchased)
-          // If out of credits, popup stays — they must purchase to continue
-          if (!isOutOfCredits) setShowTopUp(false);
-        }}
+        onClose={() => setShowTopUp(false)}
         onCheckout={() => { navigatingToCheckout.current = true; }}
       />
 
