@@ -1,0 +1,16 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.aweber-tokens.json
+.env
+.claude/
+attached_assets/
+DONNA-FIX-*.md
+agents.md
+project_pages.md
+*.png
+!client/src/assets/*.png
+!client/public/*.png
