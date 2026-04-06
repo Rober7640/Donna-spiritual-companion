@@ -353,7 +353,7 @@ export default function Chat() {
                         "I'm glad you're here tonight";
 
                       // Returning user with previous session summary (only on fresh login, not after purchase)
-                      const isReturningLogin = !sessionStorage.getItem("onboarding_faith") && !sessionStorage.getItem("chatSessionId");
+                      const isReturningLogin = !pendingRestoreMessages.current;
                       if (user?.lastSessionSummary && isReturningLogin) {
                         const userName = name || "sweetheart";
                         // Convert third-person summary to second-person (e.g. "Lewis shared" → "you shared")
