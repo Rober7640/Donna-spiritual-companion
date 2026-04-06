@@ -190,10 +190,6 @@ export async function directSignup(params: {
   if (params.name) {
     metaUpdate.displayName = params.name;
   }
-  // Set trial expiration timestamp (signup time + trial minutes)
-  if (!existingMeta.trialExpiresAt) {
-    metaUpdate.trialExpiresAt = new Date(Date.now() + CREDIT_PACKAGES.free_trial.minutes * 60 * 1000).toISOString();
-  }
   await storage.updateUser(user.id, { metadata: metaUpdate, emailVerified: true });
 
   // 4. Grant free trial credits (only if no existing balance)
@@ -235,20 +231,7 @@ export async function getMe(userId: string) {
 
   const balance = await storage.getCreditBalance(userId);
   const meta = (user.metadata as Record<string, unknown>) || {};
-  const trialExpiresAt = (meta.trialExpiresAt as string) || null;
-
-  // Check if user has purchased credits
-  const transactions = await storage.listCreditTransactions(userId);
-  const hasPurchase = transactions.some(t => t.type === "purchase");
-
-  // Auto-expire trial credits if past expiration (only for trial-only users)
-  let balanceMinutes = balance?.balanceMinutes ?? 0;
-  if (trialExpiresAt && new Date(trialExpiresAt) <= new Date() && balanceMinutes > 0) {
-    if (!hasPurchase) {
-      await storage.updateCreditBalance(userId, 0);
-      balanceMinutes = 0;
-    }
-  }
+  const balanceMinutes = balance?.balanceMinutes ?? 0;
 
   // Get last session summary for returning users (only from sessions with actual messages)
   const userSessions = await storage.listUserSessions(userId);
@@ -266,8 +249,7 @@ export async function getMe(userId: string) {
     balanceMinutes,
     faithTradition: user.faithTradition,
     onboardingConcern: user.onboardingConcern,
-    // Once user has purchased, they're no longer in trial mode
-    trialExpiresAt: hasPurchase ? null : trialExpiresAt,
+    trialExpiresAt: null,
     lastSessionSummary,
   };
 }

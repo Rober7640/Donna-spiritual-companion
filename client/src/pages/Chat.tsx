@@ -58,16 +58,6 @@ export default function Chat() {
     }
   }, [user, credits.balanceMinutes]);
 
-  // Callback for when the trial countdown hits 0
-  const handleTrialExpired = useCallback(() => {
-    if (user) {
-      setShowTopUp(true);
-      setIsOutOfCredits(true);
-      credits.refreshBalance(); // sync with server to set balance to 0
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
   // Show TopUp when server rejects message due to expired credits
   useEffect(() => {
     if (creditsExpired) {
@@ -311,8 +301,6 @@ export default function Chat() {
           <CreditTimer
             balanceMinutes={credits.balanceMinutes}
             isAuthenticated={!!user}
-            trialExpiresAt={user?.trialExpiresAt ?? null}
-            onTrialExpired={handleTrialExpired}
           />
           <Button
             variant="ghost"

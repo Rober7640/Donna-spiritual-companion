@@ -156,34 +156,12 @@ export async function fulfillCredits(
 }
 
 /**
- * Check if trial has expired and auto-zero credits if so.
- * Returns the (possibly updated) balance.
+ * Check current credit balance for a user.
+ * Returns the current balance (deductions handled by heartbeat only).
  */
 export async function checkTrialExpiration(userId: string): Promise<number> {
-  const user = await storage.getUser(userId);
-  if (!user) return 0;
-
-  const meta = (user.metadata as Record<string, unknown>) || {};
-  const trialExpiresAt = meta.trialExpiresAt as string | undefined;
-  if (!trialExpiresAt) {
-    const balance = await storage.getCreditBalance(userId);
-    return balance?.balanceMinutes ?? 0;
-  }
-
   const balance = await storage.getCreditBalance(userId);
-  const currentBalance = balance?.balanceMinutes ?? 0;
-
-  if (new Date(trialExpiresAt) <= new Date() && currentBalance > 0) {
-    // Only auto-expire if user has no purchases
-    const transactions = await storage.listCreditTransactions(userId);
-    const hasPurchase = transactions.some(t => t.type === "purchase");
-    if (!hasPurchase) {
-      await storage.updateCreditBalance(userId, 0);
-      return 0;
-    }
-  }
-
-  return currentBalance;
+  return balance?.balanceMinutes ?? 0;
 }
 
 /**
