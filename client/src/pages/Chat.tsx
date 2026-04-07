@@ -114,6 +114,7 @@ export default function Chat() {
         chat.endChat();
         sessionStorage.removeItem("chatSessionId");
         sessionStorage.removeItem("chatTranscript");
+        sessionStorage.removeItem("purchase_chat_session");
       }
     };
   }, [chat.sessionId, user, token]);
@@ -308,7 +309,10 @@ export default function Chat() {
     const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
     const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
     const userName = sessionStorage.getItem("onboarding_name") || undefined;
-    startSession(faithTradition, onboardingConcern, userName);
+    // Only mark as returning login if user has a summary AND not coming from purchase
+    const fromPurchase = !!sessionStorage.getItem("from_purchase");
+    const isReturning = !!(user?.lastSessionSummary && !fromPurchase);
+    startSession(faithTradition, onboardingConcern, userName, isReturning);
   }, [chat.sessionId, startSession, authLoading]);
 
   const handleSend = async () => {

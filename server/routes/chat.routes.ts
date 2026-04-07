@@ -23,6 +23,7 @@ const chatStartSchema = z.object({
     timestamp: z.string(),
   })).optional(),
   replaceSessionId: z.string().uuid().optional(),
+  isReturningLogin: z.boolean().optional(),
 });
 
 chatRouter.post(
@@ -30,7 +31,7 @@ chatRouter.post(
   optionalAuth,
   validate(chatStartSchema),
   asyncHandler(async (req, res) => {
-    const { faithTradition, onboardingConcern, userName, previousTranscript, replaceSessionId } = req.body;
+    const { faithTradition, onboardingConcern, userName, previousTranscript, replaceSessionId, isReturningLogin } = req.body;
 
     if (req.userId) {
       // Authenticated user — create a real session in the database
@@ -39,7 +40,7 @@ chatRouter.post(
         userId: req.userId,
         companionId: "donna",
         transcript: previousTranscript || [],
-        metadata: { faithTradition, onboardingConcern, userName },
+        metadata: { faithTradition, onboardingConcern, userName, isReturningLogin: isReturningLogin || false },
       });
 
       // Update last session timestamp
@@ -86,17 +87,20 @@ chatRouter.post(
     const { sessionId } = req.body;
     const message = sanitizeMessage(req.body.message);
 
-    // For authenticated users, fetch last session summary for returning user context
+    // For authenticated users, fetch last session summary ONLY for returning user logins.
+    // Fresh sessions ("Sit with Donna", post-purchase) should NOT reference old conversations.
+    // We check session metadata for isReturningLogin flag (set by the auth/login flow).
     let lastSessionSummary: string | undefined;
     if (req.userId) {
       const session = await storage.getSession(sessionId);
       const transcript = (session?.transcript as Array<unknown>) || [];
-      // Only fetch summary on the first message of a new session (empty transcript)
-      if (transcript.length === 0) {
+      const meta = (session?.metadata as Record<string, unknown>) || {};
+      // Only fetch summary on first message AND only if session is marked as returning login
+      if (transcript.length === 0 && meta.isReturningLogin) {
         const userSessions = await storage.listUserSessions(req.userId);
         const lastEndedSession = userSessions.find(s => {
           if (!s.endedAt || !s.summary) return false;
-          if (s.id === sessionId) return false; // skip current session
+          if (s.id === sessionId) return false;
           const t = (s.transcript as Array<unknown>) || [];
           return t.length >= 2;
         });
