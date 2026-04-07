@@ -46,7 +46,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const endChat = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
     setIsActive(false);
+    setIsCrisis(false);
   }, []);
 
   const getTranscript = useCallback((): TranscriptMessage[] => {
