@@ -81,44 +81,46 @@ export default function Chat() {
     }
   }, [chat.sessionId, user]);
 
-  // Auto-end session on unmount (navigation away) or browser close/refresh
-  // Skip if navigating to Stripe checkout (session needs to survive the redirect)
+  // Track latest session info in refs so the unmount cleanup always has current values
+  const sessionIdRef = useRef<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => { sessionIdRef.current = chat.sessionId; }, [chat.sessionId]);
+  useEffect(() => { tokenRef.current = token; }, [token]);
+
+  // Handle browser close/refresh — send end request with keepalive
   useEffect(() => {
-    if (!chat.sessionId || !user || !token) return;
-
-    const sessionId = chat.sessionId;
-    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-
     const handleBeforeUnload = () => {
-      if (navigatingToCheckout.current) return;
-      // Use fetch with keepalive for reliability on page close (supports auth headers)
+      if (navigatingToCheckout.current || !sessionIdRef.current || !tokenRef.current) return;
       fetch("/api/v1/chat/end", {
         method: "POST",
-        headers,
-        body: JSON.stringify({ sessionId }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
+        body: JSON.stringify({ sessionId: sessionIdRef.current }),
         keepalive: true,
       }).catch(() => {});
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
+  // End session on component unmount (navigation away from /chat)
+  // Uses refs so this effect has NO dependencies and only runs on unmount
+  useEffect(() => {
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Component unmount (in-app navigation) — end session unless going to checkout or already ending
-      if (!navigatingToCheckout.current && !sessionEnding.current) {
-        fetch("/api/v1/chat/end", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ sessionId }),
-          keepalive: true,
-        }).catch(() => {});
-        chat.endChat();
-        sessionStorage.removeItem("chatSessionId");
-        sessionStorage.removeItem("chatTranscript");
-        sessionStorage.removeItem("purchase_chat_session");
-      }
+      if (navigatingToCheckout.current || sessionEnding.current) return;
+      if (!sessionIdRef.current || !tokenRef.current) return;
+      fetch("/api/v1/chat/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
+        body: JSON.stringify({ sessionId: sessionIdRef.current }),
+        keepalive: true,
+      }).catch(() => {});
+      chat.endChat();
+      sessionStorage.removeItem("chatSessionId");
+      sessionStorage.removeItem("chatTranscript");
+      sessionStorage.removeItem("purchase_chat_session");
     };
-  }, [chat.sessionId, user, token]);
+  }, []);
 
   // Deliver initial greeting as multi-bubble messages with typing delays
   const greetingDelivered = useRef(false);
