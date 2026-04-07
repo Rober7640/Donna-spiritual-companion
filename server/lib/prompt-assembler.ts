@@ -27,11 +27,9 @@ export function assembleSystemPrompt(ctx: PromptContext): string {
   parts.push(ctx.companion.systemPromptTheology);
   parts.push(ctx.companion.systemPromptRules);
 
-  // User context
+  // User context — never include user's real name so Donna uses warm terms
+  // like "sweetheart", "honey", "dear" instead
   const contextLines: string[] = [];
-  if (ctx.userName) {
-    contextLines.push(`The user's name is ${ctx.userName}.`);
-  }
   if (ctx.faithTradition) {
     contextLines.push(`User's faith tradition: ${ctx.faithTradition}`);
   }

@@ -22,6 +22,7 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigatingToCheckout = useRef(false);
+  const sessionEnding = useRef(false);
   const { user, token, loading: authLoading } = useAuth();
   const chat = useChatContext();
   const {
@@ -103,8 +104,8 @@ export default function Chat() {
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Component unmount (in-app navigation) — end session unless going to checkout
-      if (!navigatingToCheckout.current) {
+      // Component unmount (in-app navigation) — end session unless going to checkout or already ending
+      if (!navigatingToCheckout.current && !sessionEnding.current) {
         fetch("/api/v1/chat/end", {
           method: "POST",
           headers,
@@ -227,7 +228,7 @@ export default function Chat() {
   // Start session on mount — restore only if returning from purchase, otherwise fresh
   // Wait for auth to finish loading so we don't accidentally create anonymous sessions
   useEffect(() => {
-    if (chat.sessionId || authLoading) return;
+    if (chat.sessionId || authLoading || sessionEnding.current) return;
 
     // Check if returning from purchase (chat session saved before Stripe redirect)
     const purchaseChatSession = sessionStorage.getItem("purchase_chat_session");
@@ -339,8 +340,8 @@ export default function Chat() {
   };
 
   const handleEnd = async () => {
-    // endSession calls the API + clears sessionStorage — the unmount cleanup
-    // will see chat.sessionId is already cleared and skip the duplicate call
+    // Prevent mount effect from restarting a session after endChat clears sessionId
+    sessionEnding.current = true;
     await endSession();
     if (user) {
       setLocation("/dashboard");
