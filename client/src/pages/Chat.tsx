@@ -134,43 +134,36 @@ export default function Chat() {
         hour >= 17 && hour < 21 ? "Good evening" :
         "I'm glad you're here tonight";
 
+      // Check if coming from a purchase — show random welcome, not summary
+      const fromPurchase = sessionStorage.getItem("from_purchase");
+      if (fromPurchase) {
+        sessionStorage.removeItem("from_purchase");
+      }
+
       let bubbles: string[];
 
-      // Returning user with previous session summary
-      if (user?.lastSessionSummary) {
-        const userName = name || "sweetheart";
+      // Returning user with previous session summary (only on fresh login, not after purchase)
+      if (user?.lastSessionSummary && !fromPurchase) {
         let summary = user.lastSessionSummary;
         if (name) {
           summary = summary.replace(new RegExp(name, "gi"), "you");
         }
         summary = summary.charAt(0).toLowerCase() + summary.slice(1);
         bubbles = [
-          `${timeGreeting}, ${userName}. I'm so glad you came back.`,
+          `${timeGreeting}, sweetheart. I'm so glad you came back.`,
           `Last time, ${summary}`,
           "What's on your heart today?",
         ];
-      } else if (name && concern) {
+      } else if (concern && !fromPurchase) {
+        // First-time user with concern from onboarding
         bubbles = [
-          `${timeGreeting}, ${name}. I'm Donna.`,
+          `${timeGreeting}, sweetheart. I'm Donna.`,
           `A mother who has prayed through more midnights than I can count.`,
           `When a woman whispers "${concern}," I listen with both hands open.`,
           `Tell me what carrying this has felt like today.`,
         ];
-      } else if (name) {
-        bubbles = [
-          `${timeGreeting}, ${name}. I'm Donna.`,
-          `A mother who has prayed through more midnights than I can count.`,
-          `What's resting on your heart right now?`,
-        ];
-      } else if (concern) {
-        bubbles = [
-          `${timeGreeting}, honey. I'm Donna.`,
-          `A mother who has prayed through more midnights than I can count.`,
-          `I heard "${concern}" is pressing on you.`,
-          `Tell me your name so I can hold it with you.`,
-        ];
       } else {
-        // Random welcome for "Sit with Donna" — no name
+        // Random welcome — "Sit with Donna", "Keep her close" purchase, or any other entry
         const welcomeSets = [
           [
             "I'm glad you're here.",
@@ -193,7 +186,7 @@ export default function Chat() {
             "What's been sitting heavy with you lately?",
           ],
           [
-            "Pull up a chair, honey.",
+            "Pull up a chair, dear.",
             "I've got all the time in the world for you.",
             "What's on your mind?",
           ],

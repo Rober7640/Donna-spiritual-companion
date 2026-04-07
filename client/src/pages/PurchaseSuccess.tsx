@@ -34,6 +34,9 @@ export default function PurchaseSuccess() {
           sessionStorage.setItem("purchase_chat_session", chatSessionId);
         }
 
+        // Flag that we're coming from a purchase (show random welcome, not summary)
+        sessionStorage.setItem("from_purchase", "true");
+
         // Auto-redirect back to chat seamlessly
         setLocation("/chat");
       } catch (err) {
