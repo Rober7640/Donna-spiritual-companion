@@ -46,6 +46,7 @@ export interface IStorage {
   getSession(id: string): Promise<Session | undefined>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, data: Partial<Session>): Promise<Session | undefined>;
+  deleteSession(id: string): Promise<boolean>;
   listUserSessions(userId: string): Promise<Session[]>;
 
   // Reengagement
@@ -134,6 +135,11 @@ export class DrizzleStorage implements IStorage {
   async updateSession(id: string, data: Partial<Session>): Promise<Session | undefined> {
     const [updated] = await db!.update(sessions).set(data).where(eq(sessions.id, id)).returning();
     return updated;
+  }
+
+  async deleteSession(id: string): Promise<boolean> {
+    const result = await db!.delete(sessions).where(eq(sessions.id, id)).returning();
+    return result.length > 0;
   }
 
   async listUserSessions(userId: string): Promise<Session[]> {
@@ -293,6 +299,10 @@ export class MemStorage implements IStorage {
     const updated = { ...session, ...data };
     this.sessionMap.set(id, updated);
     return updated;
+  }
+
+  async deleteSession(id: string) {
+    return this.sessionMap.delete(id);
   }
 
   async listUserSessions(userId: string) {

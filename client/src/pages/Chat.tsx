@@ -283,7 +283,7 @@ export default function Chat() {
               const res2 = await fetch("/api/v1/chat/start", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ faithTradition, onboardingConcern, userName, previousTranscript: transcript }),
+                body: JSON.stringify({ faithTradition, onboardingConcern, userName, previousTranscript: transcript, replaceSessionId: purchaseChatSession }),
               });
               if (res2.ok) {
                 const data = await res2.json();

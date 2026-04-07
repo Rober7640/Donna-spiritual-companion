@@ -22,6 +22,7 @@ const chatStartSchema = z.object({
     content: z.string(),
     timestamp: z.string(),
   })).optional(),
+  replaceSessionId: z.string().uuid().optional(),
 });
 
 chatRouter.post(
@@ -29,7 +30,7 @@ chatRouter.post(
   optionalAuth,
   validate(chatStartSchema),
   asyncHandler(async (req, res) => {
-    const { faithTradition, onboardingConcern, userName, previousTranscript } = req.body;
+    const { faithTradition, onboardingConcern, userName, previousTranscript, replaceSessionId } = req.body;
 
     if (req.userId) {
       // Authenticated user — create a real session in the database
@@ -43,6 +44,15 @@ chatRouter.post(
 
       // Update last session timestamp
       await storage.updateUser(req.userId, { lastSessionAt: new Date() });
+
+      // If replacing an old session (post-purchase), delete the old one
+      // so the dashboard only shows the complete merged session
+      if (replaceSessionId) {
+        const oldSession = await storage.getSession(replaceSessionId);
+        if (oldSession && oldSession.userId === req.userId) {
+          await storage.deleteSession(replaceSessionId);
+        }
+      }
 
       // Start heartbeat tracking for credit timer
       startTracking(session.id);
