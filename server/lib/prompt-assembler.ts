@@ -39,11 +39,6 @@ export function assembleSystemPrompt(ctx: PromptContext): string {
     contextLines.push(`What's on their heart: ${ctx.onboardingConcern}`);
   }
 
-  // Previous conversation context (returning users)
-  if (ctx.lastSessionSummary) {
-    contextLines.push(`This is a returning user. In their last conversation, ${ctx.lastSessionSummary} Reference this naturally if appropriate — they'll feel known and remembered.`);
-  }
-
   // Time-of-day awareness
   const hour = new Date().getHours();
   let timeOfDay = "during the day";

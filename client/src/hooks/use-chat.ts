@@ -7,7 +7,7 @@ import type { UserSignal } from "@shared/types";
 
 interface UseChatReturn {
   sendMessage: (text: string) => Promise<void>;
-  startSession: (faithTradition?: string, onboardingConcern?: string, userName?: string, isReturningLogin?: boolean) => Promise<void>;
+  startSession: (faithTradition?: string, onboardingConcern?: string, userName?: string) => Promise<void>;
   endSession: () => Promise<void>;
   isWaitingForResponse: boolean;
   isTyping: boolean;
@@ -36,11 +36,11 @@ export function useChat(): UseChatReturn {
   }, [token]);
 
   const startSession = useCallback(
-    async (faithTradition?: string, onboardingConcern?: string, userName?: string, isReturningLogin?: boolean) => {
+    async (faithTradition?: string, onboardingConcern?: string, userName?: string) => {
       const res = await fetch("/api/v1/chat/start", {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ faithTradition, onboardingConcern, userName, isReturningLogin }),
+        body: JSON.stringify({ faithTradition, onboardingConcern, userName }),
       });
 
       if (!res.ok) throw new Error("Failed to start session");

@@ -127,7 +127,6 @@ export default function Chat() {
 
     const deliverGreeting = async () => {
       const concern = sessionStorage.getItem("onboarding_concern");
-      const name = sessionStorage.getItem("onboarding_name") || user?.displayName;
       const hour = new Date().getHours();
       const timeGreeting =
         hour >= 5 && hour < 12 ? "Good morning" :
@@ -135,27 +134,12 @@ export default function Chat() {
         hour >= 17 && hour < 21 ? "Good evening" :
         "I'm glad you're here tonight";
 
-      // Check if coming from a purchase — show random welcome, not summary
-      const fromPurchase = sessionStorage.getItem("from_purchase");
-      if (fromPurchase) {
-        sessionStorage.removeItem("from_purchase");
-      }
+      // Clean up any stale purchase flags
+      sessionStorage.removeItem("from_purchase");
 
       let bubbles: string[];
 
-      // Returning user with previous session summary (only on fresh login, not after purchase)
-      if (user?.lastSessionSummary && !fromPurchase) {
-        let summary = user.lastSessionSummary;
-        if (name) {
-          summary = summary.replace(new RegExp(name, "gi"), "you");
-        }
-        summary = summary.charAt(0).toLowerCase() + summary.slice(1);
-        bubbles = [
-          `${timeGreeting}, sweetheart. I'm so glad you came back.`,
-          `Last time, ${summary}`,
-          "What's on your heart today?",
-        ];
-      } else if (concern && !fromPurchase) {
+      if (concern) {
         // First-time user with concern from onboarding
         bubbles = [
           `${timeGreeting}, sweetheart. I'm Donna.`,
@@ -163,8 +147,10 @@ export default function Chat() {
           `When a woman whispers "${concern}," I listen with both hands open.`,
           `Tell me what carrying this has felt like today.`,
         ];
+        // Clear concern so next sessions don't repeat it
+        sessionStorage.removeItem("onboarding_concern");
       } else {
-        // Random welcome — "Sit with Donna", "Keep her close" purchase, or any other entry
+        // Random welcome — every session except first onboarding
         const welcomeSets = [
           [
             "I'm glad you're here.",
@@ -302,17 +288,16 @@ export default function Chat() {
       return;
     }
 
-    // Normal visit — clean up stale references and start fresh
+    // Normal visit — clean up ALL stale references and start fresh
     sessionStorage.removeItem("chatSessionId");
     sessionStorage.removeItem("chatTranscript");
+    sessionStorage.removeItem("purchase_chat_session");
+    sessionStorage.removeItem("from_purchase");
 
     const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
     const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
     const userName = sessionStorage.getItem("onboarding_name") || undefined;
-    // Only mark as returning login if user has a summary AND not coming from purchase
-    const fromPurchase = !!sessionStorage.getItem("from_purchase");
-    const isReturning = !!(user?.lastSessionSummary && !fromPurchase);
-    startSession(faithTradition, onboardingConcern, userName, isReturning);
+    startSession(faithTradition, onboardingConcern, userName);
   }, [chat.sessionId, startSession, authLoading]);
 
   const handleSend = async () => {
