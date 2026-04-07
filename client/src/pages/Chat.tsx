@@ -276,14 +276,14 @@ export default function Chat() {
                 signal: m.signal as import("@shared/types").UserSignal | undefined,
               }));
 
-              // Start a new session, then inject old messages via restoreSession
+              // Start a new session with old transcript so dashboard shows full history
               const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
               const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
               const userName = sessionStorage.getItem("onboarding_name") || undefined;
               const res2 = await fetch("/api/v1/chat/start", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ faithTradition, onboardingConcern, userName }),
+                body: JSON.stringify({ faithTradition, onboardingConcern, userName, previousTranscript: transcript }),
               });
               if (res2.ok) {
                 const data = await res2.json();
@@ -405,9 +405,6 @@ export default function Chat() {
       <ScrollArea className="flex-1 bg-slate-50 px-4 py-6">
         <div className="mx-auto max-w-2xl space-y-6 pb-4">
 
-          {/* Typing indicator for greeting delivery */}
-          {greetingTyping && <TypingIndicator />}
-
           {/* Message Thread */}
           {chat.messages.map((msg) => (
             <motion.div
@@ -444,8 +441,8 @@ export default function Chat() {
             </motion.div>
           ))}
 
-          {/* Typing Indicator */}
-          {isTyping && <TypingIndicator />}
+          {/* Typing Indicator (greeting + regular responses) */}
+          {(isTyping || greetingTyping) && <TypingIndicator />}
 
           {/* Streaming Message */}
           {isStreaming && <StreamingMessage text={streamingText} />}

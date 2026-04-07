@@ -17,6 +17,11 @@ const chatStartSchema = z.object({
   faithTradition: z.string().max(200).optional(),
   onboardingConcern: z.string().max(500).optional(),
   userName: z.string().max(100).optional(),
+  previousTranscript: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+    timestamp: z.string(),
+  })).optional(),
 });
 
 chatRouter.post(
@@ -24,14 +29,15 @@ chatRouter.post(
   optionalAuth,
   validate(chatStartSchema),
   asyncHandler(async (req, res) => {
-    const { faithTradition, onboardingConcern, userName } = req.body;
+    const { faithTradition, onboardingConcern, userName, previousTranscript } = req.body;
 
     if (req.userId) {
       // Authenticated user — create a real session in the database
+      // If previousTranscript is provided (e.g. post-purchase restore), carry it over
       const session = await storage.createSession({
         userId: req.userId,
         companionId: "donna",
-        transcript: [],
+        transcript: previousTranscript || [],
         metadata: { faithTradition, onboardingConcern, userName },
       });
 
