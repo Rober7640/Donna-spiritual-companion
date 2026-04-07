@@ -22,8 +22,7 @@ export default function Chat() {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigatingToCheckout = useRef(false);
-  const pendingRestoreMessages = useRef<Array<{ id: string; role: "user" | "assistant"; content: string; timestamp: Date; signal?: import("@shared/types").UserSignal }> | null>(null);
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const chat = useChatContext();
   const {
     sendMessage,
@@ -40,6 +39,7 @@ export default function Chat() {
   const emailGate = useEmailGate();
   const [showTopUp, setShowTopUp] = useState(false);
   const [isOutOfCredits, setIsOutOfCredits] = useState(false);
+  const [greetingReady, setGreetingReady] = useState(false);
   const presenceLine = (() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Here with you this morning.";
@@ -117,10 +117,19 @@ export default function Chat() {
     };
   }, [chat.sessionId, user, token]);
 
+  // Simulate typing delay for the initial greeting so it feels human
+  useEffect(() => {
+    if (chat.sessionId && chat.messages.length === 0 && !greetingReady) {
+      const delay = 2000 + Math.random() * 1500; // 2–3.5s "thinking" delay
+      const timer = setTimeout(() => setGreetingReady(true), delay);
+      return () => clearTimeout(timer);
+    }
+  }, [chat.sessionId, chat.messages.length, greetingReady]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat.messages, isTyping, isStreaming, streamingText]);
+  }, [chat.messages, isTyping, isStreaming, streamingText, greetingReady]);
 
   // Handle email from onboarding (old magic link flow — skipped if already authenticated via Option B)
   useEffect(() => {
@@ -133,102 +142,20 @@ export default function Chat() {
     }
   }, []);
 
-  // Once a new session is created and we have pending messages to restore, inject them
+  // Always start a fresh session on mount (no chat history restore in chat screen)
+  // Wait for auth to finish loading so we don't accidentally create anonymous sessions
   useEffect(() => {
-    if (chat.sessionId && pendingRestoreMessages.current) {
-      const msgs = pendingRestoreMessages.current;
-      pendingRestoreMessages.current = null;
-      chat.restoreSession(chat.sessionId, msgs);
-    }
-  }, [chat.sessionId]);
+    if (chat.sessionId || authLoading) return;
 
-  // Start or restore session on mount
-  useEffect(() => {
-    if (chat.sessionId) return;
-
-    // Try to restore an existing session (e.g. returning from Stripe checkout)
-    const savedSessionId = sessionStorage.getItem("chatSessionId");
-    const savedTranscript = sessionStorage.getItem("chatTranscript");
-
-    if (savedSessionId) {
-      const tryRestore = async () => {
-        let restoredMessages: Array<{ id: string; role: "user" | "assistant"; content: string; timestamp: Date; signal?: import("@shared/types").UserSignal }> | null = null;
-
-        // Try fetching from server first
-        try {
-          const headers: Record<string, string> = {};
-          if (token) headers["Authorization"] = `Bearer ${token}`;
-
-          const res = await fetch(`/api/v1/sessions/${savedSessionId}`, { headers });
-          if (res.ok) {
-            const session = await res.json();
-            const transcript = (session.transcript || []) as Array<{
-              role: "user" | "assistant"; content: string; timestamp: string; signal?: string;
-            }>;
-
-            if (transcript.length > 0) {
-              restoredMessages = transcript.map((m, i) => ({
-                id: `restored-${i}-${Date.now()}`,
-                role: m.role as "user" | "assistant",
-                content: m.content,
-                timestamp: new Date(m.timestamp),
-                signal: m.signal as import("@shared/types").UserSignal | undefined,
-              }));
-
-              // If session is still active, restore it directly and we're done
-              if (!session.endedAt) {
-                chat.restoreSession(savedSessionId, restoredMessages);
-                sessionStorage.setItem("chatTranscript", JSON.stringify(transcript));
-                return;
-              }
-            }
-          }
-        } catch {
-          // Server fetch failed
-        }
-
-        // If no server messages, try sessionStorage
-        if (!restoredMessages && savedTranscript) {
-          try {
-            const parsed = JSON.parse(savedTranscript) as Array<{
-              role: "user" | "assistant"; content: string; timestamp: string; signal?: string;
-            }>;
-            restoredMessages = parsed.map((m, i) => ({
-              id: `restored-${i}-${Date.now()}`,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              timestamp: new Date(m.timestamp),
-              signal: m.signal as import("@shared/types").UserSignal | undefined,
-            }));
-          } catch {
-            // Corrupted data
-          }
-        }
-
-        // Clean up old session references
-        sessionStorage.removeItem("chatSessionId");
-        sessionStorage.removeItem("chatTranscript");
-
-        // If we have old messages, store them for injection after new session starts
-        if (restoredMessages && restoredMessages.length > 0) {
-          pendingRestoreMessages.current = restoredMessages;
-        }
-
-        // Start a fresh session
-        const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
-        const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
-        const userName = sessionStorage.getItem("onboarding_name") || undefined;
-        startSession(faithTradition, onboardingConcern, userName);
-      };
-      tryRestore();
-      return;
-    }
+    // Clean up any stale session references
+    sessionStorage.removeItem("chatSessionId");
+    sessionStorage.removeItem("chatTranscript");
 
     const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
     const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
     const userName = sessionStorage.getItem("onboarding_name") || undefined;
     startSession(faithTradition, onboardingConcern, userName);
-  }, [chat.sessionId, startSession]);
+  }, [chat.sessionId, startSession, authLoading]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || isWaitingForResponse) return;
@@ -317,8 +244,13 @@ export default function Chat() {
       <ScrollArea className="flex-1 bg-slate-50 px-4 py-6">
         <div className="mx-auto max-w-2xl space-y-6 pb-4">
 
-          {/* Initial greeting (before any messages) */}
-          {chat.messages.length === 0 && !isTyping && !isStreaming && (
+          {/* Typing indicator for initial greeting */}
+          {chat.messages.length === 0 && !greetingReady && chat.sessionId && (
+            <TypingIndicator />
+          )}
+
+          {/* Initial greeting (shown after typing delay) */}
+          {chat.messages.length === 0 && greetingReady && !isTyping && !isStreaming && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -340,9 +272,8 @@ export default function Chat() {
                         hour >= 17 && hour < 21 ? "Good evening" :
                         "I'm glad you're here tonight";
 
-                      // Returning user with previous session summary (only on fresh login, not after purchase)
-                      const isReturningLogin = !pendingRestoreMessages.current;
-                      if (user?.lastSessionSummary && isReturningLogin) {
+                      // Returning user with previous session summary
+                      if (user?.lastSessionSummary) {
                         const userName = name || "sweetheart";
                         // Convert third-person summary to second-person (e.g. "Lewis shared" → "you shared")
                         let summary = user.lastSessionSummary;

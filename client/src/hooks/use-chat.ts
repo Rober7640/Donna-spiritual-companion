@@ -66,12 +66,6 @@ export function useChat(): UseChatReturn {
         timestamp: new Date(),
       });
 
-      // Save transcript after user message (in case page navigates before response)
-      sessionStorage.setItem(
-        "chatTranscript",
-        JSON.stringify(chat.getTranscript()),
-      );
-
       setIsWaitingForResponse(true);
 
       // Show typing indicator with pacing delay
@@ -175,11 +169,6 @@ export function useChat(): UseChatReturn {
           signal: detectedSignal,
         });
 
-        // Save transcript to sessionStorage for recovery
-        sessionStorage.setItem(
-          "chatTranscript",
-          JSON.stringify(chat.getTranscript()),
-        );
       } catch (err) {
         if ((err as Error).message === "__CREDITS_EXPIRED__") {
           // Credits ran out — signal to show TopUp, no error message

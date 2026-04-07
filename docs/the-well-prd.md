@@ -121,11 +121,14 @@ Note: Credit purchase can only happen for authenticated users. The email gate al
 
 ### 4.3 Return User Flow
 
+> **MVP Auth (v1):** Returning users verify via Supabase magic link (built-in free tier SMTP, 3–4 emails/hour). Email sender shows `Supabase Auth <noreply@mail.app.supabase.io>` — acceptable for MVP. Email content is Donna-branded ("Welcome back, sweetheart" + "Sit with Donna" CTA). Later: use Resend or custom SMTP for branded sender address.
+
 | Step | Screen | Action |
 |---|---|---|
-| 1 | Welcome Back | Time-of-day greeting ("Can't sleep? Marie is here."). User enters email, receives magic link. |
-| 2 | Home dashboard | Sees credit balance, Marie's availability, session history |
-| 3 | Chat | New conversation begins. Marie opens warmly. Full auth from the start. |
+| 1 | Welcome Back | Time-of-day greeting ("Can't sleep? Donna is here."). User enters email. |
+| 2 | Check Email | Message: "Check your email, sweetheart. I sent you a link to come back in." Supabase sends Donna-branded magic link email. |
+| 3 | Magic Link Click | User clicks "Sit with Donna" in email → Supabase verifies → redirects to `/auth/callback` → session established. |
+| 4 | Chat | New session begins. Donna opens with previous session summary: "Last time, [summary]. What's on your heart today?" |
 
 ---
 

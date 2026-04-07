@@ -4,28 +4,39 @@
  */
 
 /**
- * Calculate the initial delay before Donna starts "typing" based on message length.
+ * Calculate the initial "thinking" delay before Donna starts typing.
+ * Simulates Donna reading and considering the user's message.
+ * Inspired by Seer Within: 60ms/char base, 1–5s range, ±20% variance.
  */
 export function getInitialDelay(userMessageLength: number): number {
-  const wordCount = userMessageLength.toString().split(/\s+/).length;
-
-  if (wordCount < 20) return randomBetween(1500, 2000);
-  if (wordCount <= 80) return randomBetween(2000, 3000);
-  return randomBetween(3000, 4000);
+  const baseSpeed = 60; // ms per character of user's message
+  const variance = 0.2;
+  const randomFactor = 1 + (Math.random() * variance * 2 - variance);
+  const baseTime = userMessageLength * baseSpeed * randomFactor;
+  return Math.min(Math.max(baseTime, 2000), 5000);
 }
 
 /**
- * Target reveal speed: ~30-40 words per second.
- * Returns milliseconds per character.
+ * Human-like typing speed: ~5-7 characters per second.
+ * Returns milliseconds per character with slight randomness.
  */
-export const TOKEN_REVEAL_INTERVAL_MS = 25; // ~40 chars/sec ≈ 8 words/sec display
+export const TOKEN_REVEAL_INTERVAL_MS = 50; // ~20 chars/sec — feels like natural reading pace
 
 /**
  * Paragraph pause duration in milliseconds.
- * When Donna's response has a paragraph break, pause before continuing.
+ * When Donna's response has a paragraph break, pause before continuing
+ * as if she's gathering her next thought.
  */
 export function getParagraphPauseMs(): number {
-  return randomBetween(800, 1200);
+  return randomBetween(1200, 2000);
+}
+
+/**
+ * Sentence-end pause: a brief pause after periods, question marks, exclamation marks.
+ * Makes longer responses feel like they're being composed thoughtfully.
+ */
+export function getSentencePauseMs(): number {
+  return randomBetween(300, 600);
 }
 
 function randomBetween(min: number, max: number): number {
@@ -88,11 +99,22 @@ export class TokenBuffer {
 
         this.displayedText += char;
 
-        // Detect paragraph break
+        // Detect paragraph break — longer pause as if gathering next thought
         if (char === "\n" && this.displayedText.endsWith("\n\n")) {
           this.onReveal(this.displayedText);
           await sleep(getParagraphPauseMs());
           continue;
+        }
+
+        // Sentence-end pause — brief breath after completing a thought
+        if ((char === "." || char === "?" || char === "!") && this.displayedText.length > 1) {
+          const prevChar = this.displayedText[this.displayedText.length - 2];
+          // Only pause on real sentence endings, not abbreviations like "St."
+          if (prevChar !== "." && prevChar !== " ") {
+            this.onReveal(this.displayedText);
+            await sleep(getSentencePauseMs());
+            continue;
+          }
         }
 
         this.onReveal(this.displayedText);
