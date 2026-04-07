@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useAuth } from "./use-auth";
 import { useChatContext } from "@/context/ChatContext";
 import { useStreaming } from "./use-streaming";
-import { getInitialDelay } from "@/lib/pacing";
+import { getInitialDelay, getMultiBubbleDelay } from "@/lib/pacing";
 import type { UserSignal } from "@shared/types";
 
 interface UseChatReturn {
@@ -97,8 +97,8 @@ export function useChat(): UseChatReturn {
           throw new Error(err.message || "Failed to send message");
         }
 
-        setIsTyping(false);
-        streaming.startStreaming();
+        // Keep typing indicator showing while stream arrives (no live streaming display)
+        // Response will be delivered as multi-bubble after stream completes
 
         // Read SSE stream
         const reader = res.body?.getReader();
@@ -130,7 +130,6 @@ export function useChat(): UseChatReturn {
                   chat.setIsCrisis(true);
                 }
               } else if (event.type === "token") {
-                streaming.pushToken(event.token);
                 fullText += event.token;
               } else if (event.type === "done") {
                 // Don't finishStreaming here — we'll reset after the reader loop
@@ -155,19 +154,43 @@ export function useChat(): UseChatReturn {
           }
         }
 
-        // Stop streaming immediately, then add the final message in the same
-        // React batch so the StreamingMessage disappears and the permanent
-        // bubble appears without any duplicate flash.
-        streaming.reset();
+        // Hide typing indicator — we'll now deliver the response as multi-bubble
+        setIsTyping(false);
 
-        // Add the complete assistant message
-        chat.addMessage({
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: fullText,
-          timestamp: new Date(),
-          signal: detectedSignal,
-        });
+        // Split response into paragraphs for multi-bubble delivery
+        const paragraphs = fullText
+          .split(/\n\n+/)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
+
+        if (paragraphs.length <= 1) {
+          // Short response — single bubble
+          chat.addMessage({
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: fullText.trim(),
+            timestamp: new Date(),
+            signal: detectedSignal,
+          });
+        } else {
+          // Multi-bubble: show each paragraph as a separate bubble with typing delay
+          for (let i = 0; i < paragraphs.length; i++) {
+            chat.addMessage({
+              id: `assistant-${Date.now()}-${i}`,
+              role: "assistant",
+              content: paragraphs[i],
+              timestamp: new Date(),
+              signal: i === paragraphs.length - 1 ? detectedSignal : undefined,
+            });
+
+            // Show typing dots between bubbles (not after the last one)
+            if (i < paragraphs.length - 1) {
+              setIsTyping(true);
+              await new Promise((r) => setTimeout(r, getMultiBubbleDelay(paragraphs[i + 1])));
+              setIsTyping(false);
+            }
+          }
+        }
 
       } catch (err) {
         if ((err as Error).message === "__CREDITS_EXPIRED__") {

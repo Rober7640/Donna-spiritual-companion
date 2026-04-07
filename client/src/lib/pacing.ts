@@ -39,6 +39,19 @@ export function getSentencePauseMs(): number {
   return randomBetween(300, 600);
 }
 
+/**
+ * Delay between multi-bubble messages.
+ * Simulates Donna "typing" the next part of her response.
+ * Based on the upcoming message length, like Seer Within's approach.
+ */
+export function getMultiBubbleDelay(nextMessage: string): number {
+  const baseSpeed = 60; // ms per character
+  const variance = 0.2;
+  const randomFactor = 1 + (Math.random() * variance * 2 - variance);
+  const baseTime = nextMessage.length * baseSpeed * randomFactor;
+  return Math.min(Math.max(baseTime, 1500), 4000);
+}
+
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }

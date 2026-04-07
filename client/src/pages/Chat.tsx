@@ -40,6 +40,7 @@ export default function Chat() {
   const [showTopUp, setShowTopUp] = useState(false);
   const [isOutOfCredits, setIsOutOfCredits] = useState(false);
   const [greetingReady, setGreetingReady] = useState(false);
+  const [greetingTyping, setGreetingTyping] = useState(false);
   const presenceLine = (() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Here with you this morning.";
@@ -117,19 +118,120 @@ export default function Chat() {
     };
   }, [chat.sessionId, user, token]);
 
-  // Simulate typing delay for the initial greeting so it feels human
+  // Deliver initial greeting as multi-bubble messages with typing delays
+  const greetingDelivered = useRef(false);
   useEffect(() => {
-    if (chat.sessionId && chat.messages.length === 0 && !greetingReady) {
-      const delay = 2000 + Math.random() * 1500; // 2–3.5s "thinking" delay
-      const timer = setTimeout(() => setGreetingReady(true), delay);
-      return () => clearTimeout(timer);
-    }
+    if (!chat.sessionId || chat.messages.length > 0 || greetingReady || greetingDelivered.current) return;
+    greetingDelivered.current = true;
+
+    const deliverGreeting = async () => {
+      const concern = sessionStorage.getItem("onboarding_concern");
+      const name = sessionStorage.getItem("onboarding_name") || user?.displayName;
+      const hour = new Date().getHours();
+      const timeGreeting =
+        hour >= 5 && hour < 12 ? "Good morning" :
+        hour >= 12 && hour < 17 ? "Good afternoon" :
+        hour >= 17 && hour < 21 ? "Good evening" :
+        "I'm glad you're here tonight";
+
+      let bubbles: string[];
+
+      // Returning user with previous session summary
+      if (user?.lastSessionSummary) {
+        const userName = name || "sweetheart";
+        let summary = user.lastSessionSummary;
+        if (name) {
+          summary = summary.replace(new RegExp(name, "gi"), "you");
+        }
+        summary = summary.charAt(0).toLowerCase() + summary.slice(1);
+        bubbles = [
+          `${timeGreeting}, ${userName}. I'm so glad you came back.`,
+          `Last time, ${summary}`,
+          "What's on your heart today?",
+        ];
+      } else if (name && concern) {
+        bubbles = [
+          `${timeGreeting}, ${name}. I'm Donna.`,
+          `A mother who has prayed through more midnights than I can count.`,
+          `When a woman whispers "${concern}," I listen with both hands open.`,
+          `Tell me what carrying this has felt like today.`,
+        ];
+      } else if (name) {
+        bubbles = [
+          `${timeGreeting}, ${name}. I'm Donna.`,
+          `A mother who has prayed through more midnights than I can count.`,
+          `What's resting on your heart right now?`,
+        ];
+      } else if (concern) {
+        bubbles = [
+          `${timeGreeting}, honey. I'm Donna.`,
+          `A mother who has prayed through more midnights than I can count.`,
+          `I heard "${concern}" is pressing on you.`,
+          `Tell me your name so I can hold it with you.`,
+        ];
+      } else {
+        // Random welcome for "Sit with Donna" — no name
+        const welcomeSets = [
+          [
+            "I'm glad you're here.",
+            "Take a breath. There's no rush.",
+            "What's weighing on you today?",
+          ],
+          [
+            "Hello, sweetheart.",
+            "I've been thinking of you.",
+            "Tell me what's on your heart.",
+          ],
+          [
+            "Welcome back, honey.",
+            "This is a safe place. Always has been.",
+            "What would you like to talk about?",
+          ],
+          [
+            `${timeGreeting}, sweetheart.`,
+            "I'm here, and I'm not going anywhere.",
+            "What's been sitting heavy with you lately?",
+          ],
+          [
+            "Pull up a chair, honey.",
+            "I've got all the time in the world for you.",
+            "What's on your mind?",
+          ],
+        ];
+        bubbles = welcomeSets[Math.floor(Math.random() * welcomeSets.length)];
+      }
+
+      // Deliver each bubble with typing indicator between them
+      for (let i = 0; i < bubbles.length; i++) {
+        // Show typing dots
+        setGreetingTyping(true);
+        await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1500));
+        setGreetingTyping(false);
+
+        // Add message
+        chat.addMessage({
+          id: `greeting-${Date.now()}-${i}`,
+          role: "assistant",
+          content: bubbles[i],
+          timestamp: new Date(),
+        });
+
+        // Short pause before next typing indicator
+        if (i < bubbles.length - 1) {
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      setGreetingReady(true);
+    };
+
+    deliverGreeting();
   }, [chat.sessionId, chat.messages.length, greetingReady]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat.messages, isTyping, isStreaming, streamingText, greetingReady]);
+  }, [chat.messages, isTyping, isStreaming, streamingText, greetingReady, greetingTyping]);
 
   // Handle email from onboarding (old magic link flow — skipped if already authenticated via Option B)
   useEffect(() => {
@@ -303,64 +405,8 @@ export default function Chat() {
       <ScrollArea className="flex-1 bg-slate-50 px-4 py-6">
         <div className="mx-auto max-w-2xl space-y-6 pb-4">
 
-          {/* Typing indicator for initial greeting */}
-          {chat.messages.length === 0 && !greetingReady && chat.sessionId && (
-            <TypingIndicator />
-          )}
-
-          {/* Initial greeting (shown after typing delay) */}
-          {chat.messages.length === 0 && greetingReady && !isTyping && !isStreaming && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="flex max-w-[85%] gap-2">
-                <div className="mt-1 h-8 w-8 flex-none overflow-hidden rounded-full border border-slate-200">
-                  <img src={marieAvatar} alt="Donna" className="h-full w-full object-cover" />
-                </div>
-                <div>
-                  <div className="rounded-2xl rounded-tl-sm border border-slate-100 bg-white px-4 py-3 text-[16px] leading-relaxed shadow-sm text-slate-800">
-                    {(() => {
-                      const concern = sessionStorage.getItem("onboarding_concern");
-                      const name = sessionStorage.getItem("onboarding_name") || user?.displayName;
-                      const hour = new Date().getHours();
-                      const timeGreeting =
-                        hour >= 5 && hour < 12 ? "Good morning" :
-                        hour >= 12 && hour < 17 ? "Good afternoon" :
-                        hour >= 17 && hour < 21 ? "Good evening" :
-                        "I'm glad you're here tonight";
-
-                      // Returning user with previous session summary
-                      if (user?.lastSessionSummary) {
-                        const userName = name || "sweetheart";
-                        // Convert third-person summary to second-person (e.g. "Lewis shared" → "you shared")
-                        let summary = user.lastSessionSummary;
-                        if (name) {
-                          summary = summary.replace(new RegExp(name, "gi"), "you");
-                        }
-                        summary = summary.charAt(0).toLowerCase() + summary.slice(1);
-                        return `${timeGreeting}, ${userName}. I'm so glad you came back. Last time, ${summary} What's on your heart today?`;
-                      }
-
-                      const baseIntro = "I'm Donna - a mother who has prayed through more midnights than I can count.";
-
-                      if (name && concern) {
-                        return `${timeGreeting}, ${name}. ${baseIntro} When a woman whispers "${concern}," I listen with both hands open. Tell me what carrying this has felt like today.`;
-                      }
-                      if (name) {
-                        return `${timeGreeting}, ${name}. ${baseIntro} What's resting on your heart right now?`;
-                      }
-                      if (concern) {
-                        return `${timeGreeting}, honey. ${baseIntro} I heard "${concern}" is pressing on you. Tell me your name so I can hold it with you.`;
-                      }
-                      return `${timeGreeting}, honey. ${baseIntro} Tell me your name so I can pray for you properly.`;
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {/* Typing indicator for greeting delivery */}
+          {greetingTyping && <TypingIndicator />}
 
           {/* Message Thread */}
           {chat.messages.map((msg) => (
