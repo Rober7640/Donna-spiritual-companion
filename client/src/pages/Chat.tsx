@@ -142,12 +142,71 @@ export default function Chat() {
     }
   }, []);
 
-  // Always start a fresh session on mount (no chat history restore in chat screen)
+  // Start session on mount — restore only if returning from purchase, otherwise fresh
   // Wait for auth to finish loading so we don't accidentally create anonymous sessions
   useEffect(() => {
     if (chat.sessionId || authLoading) return;
 
-    // Clean up any stale session references
+    // Check if returning from purchase (chat session saved before Stripe redirect)
+    const purchaseChatSession = sessionStorage.getItem("purchase_chat_session");
+
+    if (purchaseChatSession && token) {
+      // Returning from purchase — restore the previous conversation
+      sessionStorage.removeItem("purchase_chat_session");
+
+      const tryRestore = async () => {
+        try {
+          const res = await fetch(`/api/v1/sessions/${purchaseChatSession}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const session = await res.json();
+            const transcript = (session.transcript || []) as Array<{
+              role: "user" | "assistant"; content: string; timestamp: string; signal?: string;
+            }>;
+
+            if (transcript.length > 0) {
+              const restoredMessages = transcript.map((m: { role: string; content: string; timestamp: string; signal?: string }, i: number) => ({
+                id: `restored-${i}-${Date.now()}`,
+                role: m.role as "user" | "assistant",
+                content: m.content,
+                timestamp: new Date(m.timestamp),
+                signal: m.signal as import("@shared/types").UserSignal | undefined,
+              }));
+
+              // Start a new session, then inject old messages via restoreSession
+              const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
+              const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
+              const userName = sessionStorage.getItem("onboarding_name") || undefined;
+              const res2 = await fetch("/api/v1/chat/start", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ faithTradition, onboardingConcern, userName }),
+              });
+              if (res2.ok) {
+                const data = await res2.json();
+                sessionStorage.setItem("chatSessionId", data.sessionId);
+                chat.restoreSession(data.sessionId, restoredMessages);
+                setGreetingReady(true);
+                return;
+              }
+            }
+          }
+        } catch {
+          // Server fetch failed — fall through to fresh session
+        }
+
+        // Fallback: start fresh if restore failed
+        const faithTradition = sessionStorage.getItem("onboarding_faith") || undefined;
+        const onboardingConcern = sessionStorage.getItem("onboarding_concern") || undefined;
+        const userName = sessionStorage.getItem("onboarding_name") || undefined;
+        startSession(faithTradition, onboardingConcern, userName);
+      };
+      tryRestore();
+      return;
+    }
+
+    // Normal visit — clean up stale references and start fresh
     sessionStorage.removeItem("chatSessionId");
     sessionStorage.removeItem("chatTranscript");
 
@@ -368,7 +427,14 @@ export default function Chat() {
       <TopUpPopup
         isOpen={showTopUp}
         onClose={() => setShowTopUp(false)}
-        onCheckout={() => { navigatingToCheckout.current = true; }}
+        chatSessionId={chat.sessionId || undefined}
+        onCheckout={() => {
+          navigatingToCheckout.current = true;
+          // Save current chat session ID so we can restore after purchase
+          if (chat.sessionId) {
+            sessionStorage.setItem("purchase_chat_session", chat.sessionId);
+          }
+        }}
       />
 
       {/* Input Area */}

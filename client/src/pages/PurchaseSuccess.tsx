@@ -16,9 +16,10 @@ export default function PurchaseSuccess() {
   useEffect(() => {
     async function verifyAndRedirect() {
       try {
-        // Get session_id from URL (Stripe redirects here with it)
+        // Get session_id and chat_session from URL (Stripe redirects here with them)
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get("session_id");
+        const chatSessionId = params.get("chat_session");
 
         // Verify checkout with server and fulfill credits (works without webhook)
         if (sessionId && token) {
@@ -26,6 +27,12 @@ export default function PurchaseSuccess() {
         }
 
         await Promise.all([refreshUser(), refreshBalance()]);
+
+        // Save chat session ID so Chat.tsx can restore the conversation
+        // This survives even if sessionStorage was wiped during Stripe redirect (incognito)
+        if (chatSessionId) {
+          sessionStorage.setItem("purchase_chat_session", chatSessionId);
+        }
 
         // Auto-redirect back to chat seamlessly
         setLocation("/chat");

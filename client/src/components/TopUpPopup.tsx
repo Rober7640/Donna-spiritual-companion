@@ -11,9 +11,10 @@ interface TopUpPopupProps {
   onClose: () => void;
   currentBalance?: number;
   onCheckout?: () => void;
+  chatSessionId?: string;
 }
 
-export default function TopUpPopup({ isOpen, onClose, onCheckout }: TopUpPopupProps) {
+export default function TopUpPopup({ isOpen, onClose, onCheckout, chatSessionId }: TopUpPopupProps) {
   const { token } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export default function TopUpPopup({ isOpen, onClose, onCheckout }: TopUpPopupPr
     setError(null);
 
     try {
-      const { checkoutUrl } = await api.createCheckout(token, { package: packageId });
+      const { checkoutUrl } = await api.createCheckout(token, { package: packageId, chatSessionId });
       toast({
         description: "I'm opening the checkout window now. I'll be right here when you come back.",
       });

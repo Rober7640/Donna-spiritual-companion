@@ -100,6 +100,7 @@ export interface CreditBalanceResponse {
 
 export interface CheckoutBody {
   package: "starter" | "faithful";
+  chatSessionId?: string;
 }
 
 export interface CheckoutResponse {

@@ -25,6 +25,7 @@ creditsRouter.get(
 // POST /api/v1/credits/checkout — Create Stripe checkout session
 const checkoutSchema = z.object({
   package: z.enum(["starter", "faithful"]),
+  chatSessionId: z.string().uuid().optional(),
 });
 
 creditsRouter.post(
@@ -35,6 +36,7 @@ creditsRouter.post(
     const checkoutUrl = await stripeService.createCheckoutSession(
       req.userId!,
       req.body.package,
+      req.body.chatSessionId,
     );
     res.json({ checkoutUrl });
   }),

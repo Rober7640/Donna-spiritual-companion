@@ -28,6 +28,7 @@ const STRIPE_PRICE_IDS: Record<string, string | undefined> = {
 export async function createCheckoutSession(
   userId: string,
   packageKey: "starter" | "faithful",
+  chatSessionId?: string,
 ): Promise<string> {
   const s = getStripe();
   const pkg = CREDIT_PACKAGES[packageKey];
@@ -64,7 +65,7 @@ export async function createCheckoutSession(
         packageKey,
       },
     },
-    success_url: `${appUrl}/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${appUrl}/purchase-success?session_id={CHECKOUT_SESSION_ID}${chatSessionId ? `&chat_session=${chatSessionId}` : ""}`,
     cancel_url: `${appUrl}/dashboard`,
   });
 
