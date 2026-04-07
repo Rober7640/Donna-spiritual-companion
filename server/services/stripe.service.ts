@@ -41,9 +41,14 @@ export async function createCheckoutSession(
 
   const productName = `Donna — ${pkg.name} (${pkg.minutes} minutes)`;
 
+  // Pre-fill user's email on checkout page
+  const user = await storage.getUser(userId);
+  const customerEmail = user?.email || undefined;
+
   const session = await s.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
+    customer_email: customerEmail,
     line_items: [
       {
         price: priceId,

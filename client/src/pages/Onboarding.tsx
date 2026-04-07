@@ -73,14 +73,6 @@ export default function Onboarding() {
     setLocation("/chat");
   };
 
-  const handleSkip = () => {
-    // Old flow: skip without account creation (anonymous session)
-    if (firstName.trim()) {
-      sessionStorage.setItem("onboarding_name", firstName.trim());
-    }
-    setLocation("/chat");
-  };
-
   // Progress dots — subtle, not clinical
   const progressDots = (
     <div className="mb-10 flex items-center justify-center gap-2.5">
@@ -298,13 +290,6 @@ export default function Onboarding() {
                 </button>
               </form>
 
-              {/* Skip — soft, no pressure */}
-              <button
-                onClick={handleSkip}
-                className="block w-full text-center text-[13px] text-stone-400 transition-colors hover:text-stone-500"
-              >
-                Skip for now
-              </button>
             </motion.div>
           )}
         </AnimatePresence>
