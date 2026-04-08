@@ -22,11 +22,10 @@ function getSupabase() {
 export async function requestMagicLink(email: string): Promise<void> {
   const supabase = getSupabase();
 
-  const { error } = await supabase.auth.admin.generateLink({
-    type: "magiclink",
+  const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      redirectTo: `${process.env.APP_URL || "http://localhost:5000"}/api/v1/auth/verify`,
+      emailRedirectTo: `${process.env.APP_URL || "http://localhost:5000"}/api/v1/auth/verify`,
     },
   });
 
