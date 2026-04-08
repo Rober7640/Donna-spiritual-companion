@@ -20,6 +20,12 @@ function getSupabase() {
 }
 
 export async function requestMagicLink(email: string): Promise<void> {
+  // Only send magic link if user exists in our DB (returning user)
+  const existingUser = await storage.getUserByEmail(email);
+  if (!existingUser) {
+    throw new Error("No account found with this email. Please click \"New here? Meet Donna\" below.");
+  }
+
   const supabase = getSupabase();
 
   const { error } = await supabase.auth.signInWithOtp({

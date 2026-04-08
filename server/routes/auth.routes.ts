@@ -18,8 +18,12 @@ authRouter.post(
   authRequestLinkLimiter,
   validate(requestLinkSchema),
   asyncHandler(async (req, res) => {
-    await authService.requestMagicLink(req.body.email);
-    res.json({ success: true, message: "Check your email for a sign-in link." });
+    try {
+      await authService.requestMagicLink(req.body.email);
+      res.json({ success: true, message: "Check your email for a sign-in link." });
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
+    }
   }),
 );
 
