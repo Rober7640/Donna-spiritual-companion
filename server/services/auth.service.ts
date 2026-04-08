@@ -25,7 +25,7 @@ export async function requestMagicLink(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.APP_URL || "http://localhost:5000"}/api/v1/auth/verify`,
+      emailRedirectTo: `${process.env.APP_URL || "http://localhost:5000"}/login`,
     },
   });
 
