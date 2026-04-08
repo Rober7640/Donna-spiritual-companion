@@ -126,7 +126,7 @@ export default function Dashboard() {
         {/* History */}
         <div>
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-400">Where Donna sat with you</h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {loadingSessions ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
