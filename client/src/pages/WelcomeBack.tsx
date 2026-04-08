@@ -9,9 +9,9 @@ import cloudsBg from "@/assets/clouds-bg.png";
 
 export default function WelcomeBack() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
-  const { user, loginWithEmail } = useAuth();
+  const { user, login } = useAuth();
   const [, navigate] = useLocation();
 
   // If already logged in, redirect to chat
@@ -34,10 +34,10 @@ export default function WelcomeBack() {
 
     setStatus("loading");
     setMessage("");
-    const result = await loginWithEmail(email.trim());
+    const result = await login(email.trim());
     if (result.success) {
-      // Auth context will update, redirect happens via the check above
-      navigate("/chat");
+      setStatus("sent");
+      setMessage(result.message);
     } else {
       setStatus("error");
       setMessage(result.message);
@@ -76,26 +76,41 @@ export default function WelcomeBack() {
           {getTimeGreeting()}
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-             type="email"
-             value={email}
-             onChange={(e) => setEmail(e.target.value)}
-             placeholder="your@email.com"
-             className="h-14 rounded-xl border-slate-200 bg-white/80 px-4 text-center text-lg shadow-sm backdrop-blur-sm focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
-             disabled={status === "loading"}
-          />
-          <Button
-            type="submit"
-            disabled={status === "loading" || !email.trim()}
-            className="h-14 w-full rounded-full bg-[#3B6EA5] text-lg font-medium text-white shadow-lg hover:bg-[#325d8c] transition-all disabled:opacity-50"
-          >
-            {status === "loading" ? "One moment..." : "Continue with Donna"}
-          </Button>
-          {status === "error" && (
-            <p className="text-sm text-red-500">{message}</p>
-          )}
-        </form>
+        {status === "sent" ? (
+          <div className="space-y-4 text-center">
+            <p className="text-lg font-medium text-slate-700">Check your email</p>
+            <p className="text-sm text-slate-500">
+              We sent a sign-in link to <span className="font-medium text-slate-700">{email}</span>. Click the link to continue with Donna.
+            </p>
+            <button
+              onClick={() => { setStatus("idle"); setMessage(""); }}
+              className="mt-4 text-sm font-medium text-[#3B6EA5] hover:text-[#325d8c]"
+            >
+              Use a different email
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+               type="email"
+               value={email}
+               onChange={(e) => setEmail(e.target.value)}
+               placeholder="your@email.com"
+               className="h-14 rounded-xl border-slate-200 bg-white/80 px-4 text-center text-lg shadow-sm backdrop-blur-sm focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+               disabled={status === "loading"}
+            />
+            <Button
+              type="submit"
+              disabled={status === "loading" || !email.trim()}
+              className="h-14 w-full rounded-full bg-[#3B6EA5] text-lg font-medium text-white shadow-lg hover:bg-[#325d8c] transition-all disabled:opacity-50"
+            >
+              {status === "loading" ? "One moment..." : "Continue with Donna"}
+            </Button>
+            {status === "error" && (
+              <p className="text-sm text-red-500">{message}</p>
+            )}
+          </form>
+        )}
 
         <div className="mt-12">
           <Link href="/">
