@@ -55,14 +55,14 @@ export default function Landing() {
             <div className="flex flex-col items-center gap-6">
               <Link href="/onboarding">
                 <Button className="h-14 w-full max-w-[280px] rounded-full bg-[#2D6AAF] px-8 text-lg font-medium text-white shadow-md hover:bg-[#24578d] hover:shadow-lg transition-all duration-300">
-                  Talk to Donna
+                  New Here? — Meet Donna
                 </Button>
               </Link>
 
               {/* Returning user link — prominent for 45-65 age group */}
               <Link href="/login">
                 <button className="h-12 w-full max-w-[280px] rounded-full border-2 border-[#2D6AAF] px-8 text-base font-medium text-[#2D6AAF] transition-all duration-300 hover:bg-[#2D6AAF] hover:text-white">
-                  Welcome back — Sign in
+                  Already a Member? — Sign in
                 </button>
               </Link>
 
@@ -130,13 +130,13 @@ export default function Landing() {
             <div className="flex flex-col items-center gap-4">
               <Link href="/onboarding">
                 <Button className="h-14 w-full max-w-[280px] rounded-full bg-[#2D6AAF] px-8 text-lg font-medium text-white shadow-md hover:bg-[#24578d] hover:shadow-lg transition-all duration-300">
-                  Talk to Donna
+                  New Here? — Meet Donna
                 </Button>
               </Link>
 
               <Link href="/login">
                 <button className="h-12 w-full max-w-[280px] rounded-full border-2 border-[#2D6AAF] px-8 text-base font-medium text-[#2D6AAF] transition-all duration-300 hover:bg-[#2D6AAF] hover:text-white">
-                  Welcome back — Sign in
+                  Already a Member? — Sign in
                 </button>
               </Link>
 
